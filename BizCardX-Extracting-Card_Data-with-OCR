@@ -1,0 +1,95 @@
+import streamlit as st
+import easyocr
+import sqlite3
+
+# Connect to the database
+conn = sqlite3.connect('business_cards.db')
+
+# Create a table to store the business card data if it doesn't already exist
+conn.execute('''CREATE TABLE IF NOT EXISTS business_cards
+               (id INTEGER PRIMARY KEY,
+                name TEXT,
+                email TEXT,
+                phone TEXT,
+                company TEXT)''')
+
+# Define a function to extract data from an image using EasyOCR
+def extract_data(image):
+    # Initialize the EasyOCR reader
+    reader = easyocr.Reader(['en'])
+    
+    # Read the text from the image
+    results = reader.readtext(image)
+    
+    # Extract the data from the results
+    name = ''
+    email = ''
+    phone = ''
+    company = ''
+    for result in results:
+        text = result[1]
+        if '@' in text:
+            email = text
+        elif len(text) == 10 and text.isdigit():
+            phone = text
+        elif len(text.split()) == 2:
+            name = text
+        else:
+            company = text
+    
+    # Return the extracted data
+    return name, email, phone, company
+
+# Define a function to insert data into the database
+def insert_data(name, email, phone, company):
+    conn.execute("INSERT INTO business_cards (name, email, phone, company) VALUES (?, ?, ?, ?)", (name, email, phone, company))
+    conn.commit()
+
+# Define a function to update data in the database
+def update_data(id, name, email, phone, company):
+    conn.execute("UPDATE business_cards SET name=?, email=?, phone=?, company=? WHERE id=?", (name, email, phone, company, id))
+    conn.commit()
+
+# Define a function to delete data from the database
+def delete_data(id):
+    conn.execute("DELETE FROM business_cards WHERE id=?", (id,))
+    conn.commit()
+
+# Define the Streamlit app
+def app():
+    st.title('Business Card OCR')
+    
+    # Allow the user to upload an image
+    image_file = st.file_uploader('Upload an image of a business card', type=['jpg', 'jpeg', 'png'])
+    
+    if image_file is not None:
+        # Read the image data
+        image = image_file.read()
+        
+        # Extract the data from the image using EasyOCR
+        name, email, phone, company = extract_data(image)
+        
+        # Display the extracted data
+        st.subheader('Extracted Data')
+        st.write('Name:', name)
+        st.write('Email:', email)
+        st.write('Phone:', phone)
+        st.write('Company:', company)
+        
+        # Allow the user to insert the data into the database
+        if st.button('Insert Data'):
+            insert_data(name, email, phone, company)
+            st.success('Data inserted successfully')
+        
+        # Allow the user to update the data in the database
+        if st.button('Update Data'):
+            id = st.number_input('Enter the ID of the row to update', min_value=1)
+            name = st.text_input('Name', value=name)
+            email = st.text_input('Email', value=email)
+            phone = st.text_input('Phone', value=phone)
+            company = st.text_input('Company', value=company)
+            update_data(id, name, email, phone, company)
+            st.success('Data updated successfully')
+        
+        # Allow the user to delete the data from the database
+        if st.button('
